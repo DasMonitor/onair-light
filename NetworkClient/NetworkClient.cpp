@@ -168,181 +168,91 @@ done:
     return result;
 }
 
-
-int __cdecl main(int argc, char** argv)
+int sendCommand(const char* myCommand)
 {
     WSADATA wsaData;
     SOCKET ConnectSocket = INVALID_SOCKET;
     struct addrinfo* result = NULL,
         * ptr = NULL,
         hints;
-    const char* sendEnable = "1";
-    const char* sendDisable = "0";
     const char* myAddr = "192.168.29.14";
     char recvbuf[DEFAULT_BUFLEN];
     int iResult;
     int recvbuflen = DEFAULT_BUFLEN;
-    bool lastState = FALSE;
 
-    /* Validate the parameters
-    if (argc != 2) {
-        printf("usage: %s server-name\n", argv[0]);
+
+    // Initialize Winsock
+    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (iResult != 0) {
+        printf("WSAStartup failed with error: %d\n", iResult);
         return 1;
-    }*/
+    }
 
-    
+    ZeroMemory(&hints, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
 
-    std::cout << "Connected to server!\n";
-    std::cout << "Welcome, detecting audio streams..." << std::endl;
-    Sleep(1000);
-    // Begin main program loop
-    while (true) {
-        if (IsMicrophoneRecording()) {
-            std::cout << "Microphone is recording.\n";
-            // Initialize Winsock
-            iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-            if (iResult != 0) {
-                printf("WSAStartup failed with error: %d\n", iResult);
-                return 1;
-            }
+    // Resolve the server address and port
+    iResult = getaddrinfo(myAddr, DEFAULT_PORT, &hints, &result);
+    if (iResult != 0) {
+        printf("getaddrinfo failed with error: %d\n", iResult);
+        WSACleanup();
+        return 1;
+    }
 
-            ZeroMemory(&hints, sizeof(hints));
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_protocol = IPPROTO_TCP;
+    // Attempt to connect to an address until one succeeds
+    for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
 
-            // Resolve the server address and port
-            iResult = getaddrinfo(myAddr, DEFAULT_PORT, &hints, &result);
-            if (iResult != 0) {
-                printf("getaddrinfo failed with error: %d\n", iResult);
-                WSACleanup();
-                return 1;
-            }
-
-            // Attempt to connect to an address until one succeeds
-            for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
-                // Create a SOCKET for connecting to server
-                ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
-                    ptr->ai_protocol);
-                if (ConnectSocket == INVALID_SOCKET) {
-                    printf("socket failed with error: %ld\n", WSAGetLastError());
-                    WSACleanup();
-                    return 1;
-                }
-
-                // Connect to server.
-                iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-
-                if (iResult == SOCKET_ERROR) {
-                    closesocket(ConnectSocket);
-                    ConnectSocket = INVALID_SOCKET;
-                    continue;
-                }
-                break;
-            }
-
-            freeaddrinfo(result);
-
-            if (ConnectSocket == INVALID_SOCKET) {
-                printf("Unable to connect to server!\n");
-                WSACleanup();
-                return 1;
-            }
-            // Send an initial buffer
-            iResult = send(ConnectSocket, sendEnable, (int)strlen(sendEnable), 0);
-            if (iResult == SOCKET_ERROR) {
-                printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(ConnectSocket);
-                WSACleanup();
-                return 1;
-            }
-            lastState = TRUE;
-
-        }
-        else if (!IsMicrophoneRecording()) {
-            std::cout << "Microphone is not recording.\n";
-            // Initialize Winsock
-            iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-            if (iResult != 0) {
-                printf("WSAStartup failed with error: %d\n", iResult);
-                return 1;
-            }
-
-            ZeroMemory(&hints, sizeof(hints));
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_protocol = IPPROTO_TCP;
-
-            // Resolve the server address and port
-            iResult = getaddrinfo(myAddr, DEFAULT_PORT, &hints, &result);
-            if (iResult != 0) {
-                printf("getaddrinfo failed with error: %d\n", iResult);
-                WSACleanup();
-                return 1;
-            }
-
-            // Attempt to connect to an address until one succeeds
-            for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
-                // Create a SOCKET for connecting to server
-                ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
-                    ptr->ai_protocol);
-                if (ConnectSocket == INVALID_SOCKET) {
-                    printf("socket failed with error: %ld\n", WSAGetLastError());
-                    WSACleanup();
-                    return 1;
-                }
-
-                // Connect to server.
-                iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-
-                if (iResult == SOCKET_ERROR) {
-                    closesocket(ConnectSocket);
-                    ConnectSocket = INVALID_SOCKET;
-                    continue;
-                }
-                break;
-            }
-
-            freeaddrinfo(result);
-
-            if (ConnectSocket == INVALID_SOCKET) {
-                printf("Unable to connect to server!\n");
-                WSACleanup();
-                return 1;
-            }
-
-            // Send an initial buffer
-            iResult = send(ConnectSocket, sendDisable, (int)strlen(sendDisable), 0);
-            if (iResult == SOCKET_ERROR) {
-                printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(ConnectSocket);
-                WSACleanup();
-                return 1;
-            }
-            lastState = FALSE;
-        }
-        Sleep(5000);
-        system("CLS");
-
-        
-        // shutdown the connection since no more data will be sent
-        iResult = shutdown(ConnectSocket, SD_SEND);
-        if (iResult == SOCKET_ERROR) {
-            printf("shutdown failed with error: %d\n", WSAGetLastError());
-            closesocket(ConnectSocket);
+        // Create a SOCKET for connecting to server
+        ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
+            ptr->ai_protocol);
+        if (ConnectSocket == INVALID_SOCKET) {
+            printf("socket failed with error: %ld\n", WSAGetLastError());
             WSACleanup();
             return 1;
         }
+
+        // Connect to server.
+        iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+
+        if (iResult == SOCKET_ERROR) {
+            closesocket(ConnectSocket);
+            ConnectSocket = INVALID_SOCKET;
+            continue;
+        }
+        break;
     }
-    
+
+    freeaddrinfo(result);
+
+    if (ConnectSocket == INVALID_SOCKET) {
+        printf("Unable to connect to server!\n");
+        WSACleanup();
+        return 1;
+    }
+    // Send an initial buffer
+    iResult = send(ConnectSocket, myCommand, (int)strlen(myCommand), 0);
+    if (iResult == SOCKET_ERROR) {
+        printf("send failed with error: %d\n", WSAGetLastError());
+        closesocket(ConnectSocket);
+        WSACleanup();
+        return 1;
+    }
+    // shutdown the connection since no more data will be sent
+    iResult = shutdown(ConnectSocket, SD_SEND);
+    if (iResult == SOCKET_ERROR) {
+        printf("shutdown failed with error: %d\n", WSAGetLastError());
+        closesocket(ConnectSocket);
+        WSACleanup();
+        return 1;
+    }
 
     printf("Bytes Sent: %ld\n", iResult);
     // cleanup
     closesocket(ConnectSocket);
     WSACleanup();
-    
+
 
     // Receive until the peer closes the connection
     do {
@@ -356,8 +266,44 @@ int __cdecl main(int argc, char** argv)
             printf("recv failed with error: %d\n", WSAGetLastError());
 
     } while (iResult > 0);
+}
 
-    
+int __cdecl main(int argc, char** argv)
+{
+    bool lastState = FALSE;
+    const char* sendEnable = "1";
+    const char* sendDisable = "0";
+
+
+    /* Validate the parameters
+    if (argc != 2) {
+        printf("usage: %s server-name\n", argv[0]);
+        return 1;
+    }*/
+
+
+    std::cout << "Connected to server!\n";
+    std::cout << "Welcome, detecting audio streams..." << std::endl;
+    Sleep(1000);
+    // Begin main program loop
+    while (true) {
+        if (IsMicrophoneRecording() && lastState == FALSE) {
+            std::cout << "Microphone is recording.\n";
+            sendCommand(sendEnable);
+            lastState = TRUE;
+
+        }
+        else if (!IsMicrophoneRecording() && lastState == TRUE) {
+            std::cout << "Microphone is not recording.\n";
+            sendCommand(sendDisable);
+            lastState = FALSE;
+        }
+        Sleep(500); // sleep for half a second, close to realtime detection.
+        system("CLS");
+
+
+
+    }
 
     return 0;
 }

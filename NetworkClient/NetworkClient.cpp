@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string>
 #include <iostream>
+#include <iomanip>
 
 #include <initguid.h>
 #include <mmdeviceapi.h>
@@ -249,9 +250,8 @@ int sendCommand(const char* myCommand)
     }
 
     printf("Bytes Sent: %ld\n", iResult);
-    // cleanup
-    closesocket(ConnectSocket);
-    WSACleanup();
+    
+
 
 
     // Receive until the peer closes the connection
@@ -266,6 +266,17 @@ int sendCommand(const char* myCommand)
             printf("recv failed with error: %d\n", WSAGetLastError());
 
     } while (iResult > 0);
+
+    // cleanup
+    closesocket(ConnectSocket);
+    WSACleanup();
+}
+
+std::ostream& field(std::ostream& o)
+{
+    // usually the console is 80-character wide.
+    // divide the line into four fields.
+    return o << std::setw(20) << std::right;
 }
 
 int __cdecl main(int argc, char** argv)
@@ -288,22 +299,51 @@ int __cdecl main(int argc, char** argv)
     // Begin main program loop
     while (true) {
         if (IsMicrophoneRecording() && lastState == FALSE) {
-            std::cout << "Microphone is recording.\n";
+            std::string n = "Microphone is recording.";
+            size_t fieldWidth = n.size();
+
+            std::cout << field << n << std::endl;
+
+            //std::cout << "Microphone is recording.\n";
             sendCommand(sendEnable);
             lastState = TRUE;
 
         }
         else if (!IsMicrophoneRecording() && lastState == TRUE) {
-            std::cout << "Microphone is not recording.\n";
+            //std::cout << "Microphone is not recording.\n";
+  
             sendCommand(sendDisable);
             lastState = FALSE;
         }
+        if (lastState) {
+            std::string n = "Microphone is recording.";
+
+            std::cout << "+----------------------+" << std::endl
+                << "|                      |" << std::endl
+                << "|                      |" << std::endl
+                << "|        ON AIR        |" << std::endl
+                << "|                      |" << std::endl
+                << "|                      |" << std::endl
+                << "+----------------------+" << std::endl;
+            size_t fieldWidth = n.size();
+
+            std::cout << field << n << std::endl;
+        }
+        else if (!lastState) {
+            std::string n = "Microphone is not recording.";
+            std::cout << "+----------------------+" << std::endl
+                << "|                      |" << std::endl
+                << "|                      |" << std::endl
+                << "|       OFF AIR        |" << std::endl
+                << "|                      |" << std::endl
+                << "|                      |" << std::endl
+                << "+----------------------+" << std::endl;
+            size_t fieldWidth = n.size();
+
+            std::cout << field << n << std::endl;
+        }
         Sleep(500); // sleep for half a second, close to realtime detection.
         system("CLS");
-
-
-
-    }
-
+    }   
     return 0;
 }
